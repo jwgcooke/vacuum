@@ -71,6 +71,37 @@ func (a Alphabetical) RunRule(nodes []*yaml.Node, context model.RuleFunctionCont
 					if rs != nil {
 						results = append(results, *rs)
 					}
+				} else if len(mapKeys) == 0 {
+					// If no string keys found, report the original error (map requires keyedBy)
+					locatedObjects, err := context.DrDocument.LocateModel(node)
+					locatedPath := pathValue
+					var allPaths []string
+					if err == nil && locatedObjects != nil {
+						for x, obj := range locatedObjects {
+							if x == 0 {
+								locatedPath = obj.GenerateJSONPath()
+							}
+							allPaths = append(allPaths, obj.GenerateJSONPath())
+						}
+					}
+					result := model.RuleFunctionResult{
+						Message: vacuumUtils.SuppliedOrDefault(context.Rule.Message,
+							fmt.Sprintf("%s: `%s` is a map/object. %s", context.Rule.Description,
+								node.Value, a.GetSchema().ErrorMessage)),
+						StartNode: node,
+						EndNode:   vacuumUtils.BuildEndNode(node),
+						Path:      locatedPath,
+						Rule:      context.Rule,
+					}
+					if len(allPaths) > 1 {
+						result.Paths = allPaths
+					}
+					results = append(results, result)
+					if len(locatedObjects) > 0 {
+						if arr, ok := locatedObjects[0].(v3.AcceptsRuleResults); ok {
+							arr.AddRuleFunctionResult(v3.ConvertRuleResult(&result))
+						}
+					}
 				}
 				continue
 			}

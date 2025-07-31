@@ -62,6 +62,7 @@ func (a Alphabetical) RunRule(nodes []*yaml.Node, context model.RuleFunctionCont
 		}
 
 		if utils.IsNodeMap(node) {
+			var mapResults []model.RuleFunctionResult
 			if keyedBy == "" {
 				// Sort by map keys when keyedBy is not provided
 				mapKeys := a.extractMapKeys(node)
@@ -69,15 +70,16 @@ func (a Alphabetical) RunRule(nodes []*yaml.Node, context model.RuleFunctionCont
 					// Report one violation per unsorted map for deterministic behavior
 					rs := a.reportMapKeyViolation(node, mapKeys, context)
 					if rs != nil {
-						results = append(results, *rs)
+						mapResults = append(mapResults, *rs)
 					}
 				}
 				// If map has no string keys or keys are sorted, pass validation
 			} else {
 				resultsFromKey := a.processMap(node, keyedBy, context)
-				results = compareStringArray(node, resultsFromKey, context)
+				mapResults = compareStringArray(node, resultsFromKey, context)
 			}
-			results = model.MapPathAndNodesToResults(pathValue, node, node, results)
+			mapResults = model.MapPathAndNodesToResults(pathValue, node, node, mapResults)
+			results = append(results, mapResults...)
 			continue
 		}
 

@@ -73,11 +73,10 @@ func (a Alphabetical) RunRule(nodes []*yaml.Node, context model.RuleFunctionCont
 					}
 				}
 				// If map has no string keys or keys are sorted, pass validation
-				continue
+			} else {
+				resultsFromKey := a.processMap(node, keyedBy, context)
+				results = compareStringArray(node, resultsFromKey, context)
 			}
-
-			resultsFromKey := a.processMap(node, keyedBy, context)
-			results = compareStringArray(node, resultsFromKey, context)
 			results = model.MapPathAndNodesToResults(pathValue, node, node, results)
 			continue
 		}

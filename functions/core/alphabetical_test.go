@@ -299,3 +299,59 @@ func TestAlphabetical_RunRule_ObjectFailNoKeyedBy(t *testing.T) {
 
 	assert.Len(t, res, 1)
 }
+
+func TestAlphabetical_RunRule_MapKeysSortedSuccess(t *testing.T) {
+	yml := `components:
+  schemas:
+    aaa:
+      type: string
+    bbb:
+      type: string
+    ccc:
+      type: string`
+
+	path := "$.components.schemas"
+
+	nodes, _ := utils.FindNodes([]byte(yml), path)
+
+	opts := make(map[string]any)
+	// No keyedBy provided - should sort by map keys
+
+	rule := buildCoreTestRule(path, model.SeverityError, "alphabetical", "", opts)
+	ctx := buildCoreTestContextFromRule(model.CastToRuleAction(rule.Then), rule)
+	ctx.Given = path
+	ctx.Rule = &rule
+
+	def := &Alphabetical{}
+	res := def.RunRule(nodes, ctx)
+
+	assert.Len(t, res, 0) // No violations - keys are already sorted
+}
+
+func TestAlphabetical_RunRule_MapKeysUnsortedFail(t *testing.T) {
+	yml := `components:
+  schemas:
+    zebra:
+      type: string
+    apple:
+      type: string
+    banana:
+      type: string`
+
+	path := "$.components.schemas"
+
+	nodes, _ := utils.FindNodes([]byte(yml), path)
+
+	opts := make(map[string]any)
+	// No keyedBy provided - should sort by map keys
+
+	rule := buildCoreTestRule(path, model.SeverityError, "alphabetical", "", opts)
+	ctx := buildCoreTestContextFromRule(model.CastToRuleAction(rule.Then), rule)
+	ctx.Given = path
+	ctx.Rule = &rule
+
+	def := &Alphabetical{}
+	res := def.RunRule(nodes, ctx)
+
+	assert.Len(t, res, 1) // Should report violation - keys are not sorted
+}

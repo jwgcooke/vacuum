@@ -48,9 +48,6 @@ func (a Alphabetical) RunRule(nodes []*yaml.Node, context model.RuleFunctionCont
 
 	var keyedBy string
 
-	// extract a custom message
-	message := context.Rule.Message
-
 	// check supplied type - use cached options to avoid repeated interface conversions
 	props := context.GetOptionsStringMap()
 	if props["keyedBy"] != "" {
@@ -65,39 +62,16 @@ func (a Alphabetical) RunRule(nodes []*yaml.Node, context model.RuleFunctionCont
 
 		if utils.IsNodeMap(node) {
 			if keyedBy == "" {
-				locatedObjects, err := context.DrDocument.LocateModel(node)
-				locatedPath := pathValue
-				var allPaths []string
-				if err == nil && locatedObjects != nil {
-					for x, obj := range locatedObjects {
-						if x == 0 {
-							locatedPath = obj.GenerateJSONPath()
-						}
-						allPaths = append(allPaths, obj.GenerateJSONPath())
-					}
+				// Sort by map keys when keyedBy is not provided
+				mapKeys := a.extractMapKeys(node)
+				if len(mapKeys) > 0 {
+					mapResults := a.reportMapKeyViolation(node, mapKeys, context)
+					results = append(results, mapResults...)
 				}
-				result := model.RuleFunctionResult{
-					Message: vacuumUtils.SuppliedOrDefault(message,
-						model.GetStringTemplates().BuildTypeErrorMessage(context.Rule.Description, node.Value, "map/object", a.GetSchema().ErrorMessage)),
-					StartNode: node,
-					EndNode:   vacuumUtils.BuildEndNode(node),
-					Path:      locatedPath,
-					Rule:      context.Rule,
-				}
-				if len(allPaths) > 1 {
-					result.Paths = allPaths
-				}
-				results = append(results, result)
-				if len(locatedObjects) > 0 {
-					if arr, ok := locatedObjects[0].(v3.AcceptsRuleResults); ok {
-						arr.AddRuleFunctionResult(v3.ConvertRuleResult(&result))
-					}
-				}
-				continue
+			} else {
+				resultsFromKey := a.processMap(node, keyedBy, context)
+				results = append(results, compareStringArray(node, resultsFromKey, context)...)
 			}
-
-			resultsFromKey := a.processMap(node, keyedBy, context)
-			results = compareStringArray(node, resultsFromKey, context)
 			results = model.MapPathAndNodesToResults(pathValue, node, node, results)
 			continue
 		}
@@ -360,4 +334,23 @@ func (a Alphabetical) evaluateFloatArray(node *yaml.Node, floatArray []float64, 
 		}
 	}
 	return results
+}
+
+// extractMapKeys extracts and sorts the keys from a map node
+func (a Alphabetical) extractMapKeys(node *yaml.Node) []string {
+	var keys []string
+	for i := 0; i < len(node.Content); i += 2 {
+		if i < len(node.Content) {
+			keys = append(keys, node.Content[i].Value)
+		}
+	}
+	return keys
+}
+
+// reportMapKeyViolation checks if map keys are sorted and reports violations
+func (a Alphabetical) reportMapKeyViolation(node *yaml.Node, keys []string, context model.RuleFunctionContext) []model.RuleFunctionResult {
+	if sort.StringsAreSorted(keys) {
+		return nil
+	}
+	return compareStringArray(node, keys, context)
 }
